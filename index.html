@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Rooms by Region & Site (Sorted by Room Count)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+    #regions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .region-box {
+      border: 2px solid #333;
+      border-radius: 6px;
+      padding: 16px;
+    }
+    .region-box h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 4px;
+    }
+    .sites-container {
+      column-width: 200px;
+      column-gap: 16px;
+    }
+    .site-box {
+      display: inline-block;
+      width: 100%;
+      break-inside: avoid-column;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 8px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      box-sizing: border-box;
+    }
+    .site-box h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+    .site-box ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 14px;
+    }
+    .site-box li {
+      position: relative;
+      margin-bottom: 4px;
+      padding: 2px;
+    }
+    .site-box li:hover {
+      background-color: #eee;
+    }
+    .room-tooltip {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 6px 10px;
+      border-radius: 4px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      white-space: nowrap;
+      z-index: 10;
+    }
+    .site-box li:hover .room-tooltip {
+      display: block;
+    }
+    .room-green {
+      color: green;
+      font-weight: normal;
+    }
+    .room-red {
+      color: red;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Rooms by Region & Site</h1>
+  <div id="regions-container"></div>
+
+  <script>
+    // 1. Generate 100 random 3‑letter site names
+    function generateRandomSiteNames(n) {
+      const set = new Set();
+      while (set.size < n) {
+        let code = '';
+        for (let i = 0; i < 3; i++) {
+          code += String.fromCharCode(65 + Math.floor(Math.random() * 26));
+        }
+        set.add(code);
+      }
+      return Array.from(set).map(c => `Site ${c}`);
+    }
+    const siteLabels = generateRandomSiteNames(100);
+
+    // 2. Evenly assign to AMS (34), EMEA (33), APJ (33)
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+    const shuffled = [...siteLabels];
+    shuffle(shuffled);
+    const regionLabels = ['AMS','EMEA','APJ'];
+    const regionAssignment = {
+      AMS: shuffled.slice(0,34),
+      EMEA: shuffled.slice(34,67),
+      APJ: shuffled.slice(67,100)
+    };
+
+    // 3. Generate 1000 rooms, assign randomly to sites, and mark 3% red
+    function generateRooms(count, sites) {
+      const rooms = [];
+      for (let i = 1; i <= count; i++) {
+        const site = sites[Math.floor(Math.random() * sites.length)];
+        const isRed = Math.random() < 0.03;
+        rooms.push({
+          site,
+          room: `Room ${i}`,
+          statusClass: isRed ? 'room-red' : 'room-green'
+        });
+      }
+      return rooms;
+    }
+    const rooms = generateRooms(1000, siteLabels);
+
+    // 4. Group rooms by site
+    const roomsBySite = rooms.reduce((acc, { site, room, statusClass }) => {
+      (acc[site] = acc[site] || []).push({ room, statusClass });
+      return acc;
+    }, {});
+
+    // 5. Render regions → sites (sorted) → rooms
+    const regionsContainer = document.getElementById('regions-container');
+    regionLabels.forEach(region => {
+      const box = document.createElement('div');
+      box.className = 'region-box';
+
+      const title = document.createElement('h2');
+      title.textContent = region;
+      box.appendChild(title);
+
+      const sitesDiv = document.createElement('div');
+      sitesDiv.className = 'sites-container';
+
+      // sort sites by descending room count
+      const sites = regionAssignment[region].slice().sort((a, b) => {
+        const countA = (roomsBySite[a] || []).length;
+        const countB = (roomsBySite[b] || []).length;
+        return countB - countA;
+      });
+
+      sites.forEach(site => {
+        const siteBox = document.createElement('div');
+        siteBox.className = 'site-box';
+
+        const siteTitle = document.createElement('h3');
+        siteTitle.textContent = `${site} (${(roomsBySite[site]||[]).length})`;
+        siteBox.appendChild(siteTitle);
+
+        const ul = document.createElement('ul');
+        (roomsBySite[site] || []).forEach(({ room, statusClass }) => {
+          const li = document.createElement('li');
+          li.className = statusClass;
+
+          const span = document.createElement('span');
+          span.textContent = room;
+          li.appendChild(span);
+
+          const tip = document.createElement('div');
+          tip.className = 'room-tooltip';
+          tip.innerHTML =
+            'Room status: Here<br>' +
+            'Recent report: None<br>' +
+            'Last booked: X';
+          li.appendChild(tip);
+
+          ul.appendChild(li);
+        });
+        siteBox.appendChild(ul);
+
+        sitesDiv.appendChild(siteBox);
+      });
+
+      box.appendChild(sitesDiv);
+      regionsContainer.appendChild(box);
+    });
+  </script>
+
+</body>
+</html>
